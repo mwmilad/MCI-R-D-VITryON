@@ -1,0 +1,4 @@
+venv
+MNIST
+.vscode
+__pycache__
