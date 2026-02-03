@@ -2,3 +2,4 @@ venv
 MNIST
 .vscode
 __pycache__
+.gitignore

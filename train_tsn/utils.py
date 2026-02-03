@@ -38,5 +38,3 @@ def show_images_grid(images, n_cols=4, figsize=(10, 5)):
     
     plt.tight_layout()
     plt.show()
-
-
