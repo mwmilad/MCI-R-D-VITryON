@@ -9,6 +9,8 @@ import time
 
 from networks import GMM
 
+from typing import Literal
+
 #from networks import GMM UnetGenerator, VGGLoss, load_checkpoint, save_checkpoint
 
 # from tensorboardX import SummaryWriter
@@ -20,7 +22,6 @@ def get_opt():
     parser.add_argument("--gpu_ids", default = "")
     parser.add_argument('-j', '--workers', type=int, default=1)
     parser.add_argument('-b', '--batch-size', type=int, default=4)
-    
     parser.add_argument("--dataroot", default = "data")
     parser.add_argument("--datamode", default = "train")
     parser.add_argument("--stage", default = "GMM")
@@ -42,12 +43,13 @@ def get_opt():
     opt = parser.parse_args()
     return opt
 
+device: Literal['cpu', 'cuda'] = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 gmm = GMM(get_opt())
 print("GMM Network Create.")
 
 def train_gmm(opt, train_loader, model, board):
-    model.cuda()
+    model.to(device)
     model.train()
 
     # criterion
@@ -61,7 +63,7 @@ def train_gmm(opt, train_loader, model, board):
     for step in range(opt.keep_step + opt.decay_step):
         iter_start_time = time.time()
         inputs = train_loader.next_batch()
-            
+
         im = inputs['image'].cuda()
         im_pose = inputs['pose_image'].cuda()
         im_h = inputs['head'].cuda()
