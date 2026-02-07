@@ -2,4 +2,5 @@ venv
 MNIST
 .vscode
 __pycache__
+ّInference
 .gitignore
