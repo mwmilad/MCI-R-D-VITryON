@@ -1,6 +1,6 @@
 venv
 MNIST
+ClothWarp/data
 .vscode
 __pycache__
-Inference
 .gitignore
