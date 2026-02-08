@@ -45,13 +45,14 @@ def get_opt():
 
 device: Literal['cpu', 'cuda'] = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+
 gmm = GMM(get_opt())
 print("GMM Network Create.")
 
 def train_gmm(opt, train_loader, model, board):
     model.to(device)
     model.train()
-
+    
     # criterion
     criterionL1 = nn.L1Loss()
     
