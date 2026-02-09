@@ -85,6 +85,3 @@ if __name__ == "__main__":
     print(f"GT shape: {sample['gt'].shape}")
     print(f"Image min/max: {sample['image'].min():.3f}/{sample['image'].max():.3f}")
     print(f"Mask min/max: {sample['mask'].min():.3f}/{sample['mask'].max():.3f}")
-
-    print("-" * 20, "Final test", "-" * 20)
-    print(next(iter(dataset)))
