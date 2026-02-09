@@ -1,8 +1,8 @@
+import torchvision
 import os 
 import torch
-import torchvision
-from torch.utils.data import Dataset, DataLoader
-import random
+from torchvision import transforms
+from torch.utils.data import Dataset
 from PIL import Image
 
 
@@ -10,35 +10,81 @@ class ClothWarpingVVHD(Dataset):
     """
     Custom DataLoader for train Warping Module on VITHON-HD Dataset on data folder.
     """
-    def __init__(self, data_path=r'data\zalando-hd-resized\train') -> None:
-
+    def __init__(self, data_path=r'data\zalando-hd-resized\train', w=768, h=1024) -> None:
+        self.w, self.h = int(w / 2), int(h / 2)
+        
         # Create Paths
         self.BASE_PATH = data_path
-        self.IMAGE_PATH = os.path.join(self.BASE_PATH, 'image') # full body image. (person image)
-        self.CLOTH_PATH = os.path.join(self.BASE_PATH, 'cloth') # in-shop cloth image.
-        self.MASK_CLOTH_PATH = os.path.join(self.BASE_PATH, 'cloth-mask') # in-shop cloth full mask image.
+        self.IMAGE_PATH = os.path.join(self.BASE_PATH, 'image')
+        self.CLOTH_PATH = os.path.join(self.BASE_PATH, 'cloth')
+        self.MASK_CLOTH_PATH = os.path.join(self.BASE_PATH, 'cloth-mask')
         self.DENSE_POSE_PATH = os.path.join(self.BASE_PATH, 'image-densepose')
-        self.GT_CLOTH_PATH = os.path.join(self.BASE_PATH, 'gt_cloth_warped_mask') # gt (warped cloth)
+        self.GT_CLOTH_PATH = os.path.join(self.BASE_PATH, 'gt_cloth_warped_mask')
         
-        # Create list of paths from base path
-        self.image_paths = [os.path.join(self.IMAGE_PATH, path) for path in os.listdir(self.IMAGE_PATH)]
-        self.cloth_paths = [os.path.join(self.CLOTH_PATH, path) for path in os.listdir(self.CLOTH_PATH)]
-        self.mask_cloth_paths = [os.path.join(self.MASK_CLOTH_PATH, path) for path in os.listdir(self.MASK_CLOTH_PATH)]
-        self.dense_pose_paths = [os.path.join(self.DENSE_POSE_PATH, path) for path in os.listdir(self.DENSE_POSE_PATH)]
-        self.gt_cloth_paths = [os.path.join(self.GT_CLOTH_PATH, path) for path in os.listdir(self.GT_CLOTH_PATH)]
+        # Get sorted lists to ensure correspondence
+        self.image_files = sorted(os.listdir(self.IMAGE_PATH))
+        self.cloth_files = sorted(os.listdir(self.CLOTH_PATH))
+        self.mask_files = sorted(os.listdir(self.MASK_CLOTH_PATH))
+        self.gt_files = sorted(os.listdir(self.GT_CLOTH_PATH))
+        
+        # Create full paths
+        self.image_paths = [os.path.join(self.IMAGE_PATH, f) for f in self.image_files]
+        self.cloth_paths = [os.path.join(self.CLOTH_PATH, f) for f in self.cloth_files]
+        self.mask_cloth_paths = [os.path.join(self.MASK_CLOTH_PATH, f) for f in self.mask_files]
+        self.gt_cloth_paths = [os.path.join(self.GT_CLOTH_PATH, f) for f in self.gt_files]
+        
+        # Define transforms
+        self.img_transform = transforms.Compose([
+            transforms.Resize((self.h, self.w)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                std=[0.229, 0.224, 0.225])
+        ])
+        
+        self.mask_transform = transforms.Compose([
+            transforms.Resize((self.h, self.w)),
+            transforms.ToTensor()
+        ])
 
-    
-    def _test(self):
-        return self.image_paths, self.cloth_paths, self.mask_cloth_paths, self.dense_pose_paths, self.gt_cloth_paths
-    
     def __len__(self):
-        pass
+        return len(self.image_paths)
 
     def __getitem__(self, idx):
-        pass
+        # Read images
+        image = Image.open(self.image_paths[idx]).convert('RGB')
+        cloth = Image.open(self.cloth_paths[idx]).convert('RGB')
+        mask = Image.open(self.mask_cloth_paths[idx]).convert('L')  # Grayscale
+        gt = Image.open(self.gt_cloth_paths[idx]).convert('RGB')
+        
+        # Apply transforms
+        image = self.img_transform(image)
+        cloth = self.img_transform(cloth)
+        mask = self.mask_transform(mask)
+        gt = self.img_transform(gt)
+        
+        return {
+            'image': image,
+            'cloth': cloth,
+            'mask': mask,
+            'gt': gt,
+            'image_path': self.image_paths[idx],
+            'cloth_path': self.cloth_paths[idx]
+        }
 
-dataloader = ClothWarpingVVHD()
-out = dataloader._test()
-for res in out:
-    img = Image.open(res[4156])
-    img.show()
+
+# Test the dataset
+if __name__ == "__main__":
+    dataset = ClothWarpingVVHD()
+    
+    # Get a sample
+    sample = dataset[0]
+    
+    print(f"Image shape: {sample['image'].shape}")
+    print(f"Cloth shape: {sample['cloth'].shape}")
+    print(f"Mask shape: {sample['mask'].shape}")
+    print(f"GT shape: {sample['gt'].shape}")
+    print(f"Image min/max: {sample['image'].min():.3f}/{sample['image'].max():.3f}")
+    print(f"Mask min/max: {sample['mask'].min():.3f}/{sample['mask'].max():.3f}")
+
+    print("-" * 20, "Final test", "-" * 20)
+    print(next(iter(dataset)))
