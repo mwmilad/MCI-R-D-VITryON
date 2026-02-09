@@ -50,6 +50,8 @@ device: Literal['cpu', 'cuda'] = 'cuda' if torch.cuda.is_available() else 'cpu'
 gmm = GMM(get_opt())
 print("GMM Network Create.")
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 def train_gmm(opt, train_loader, model, board):
     model.to(device)
     model.train()
@@ -66,15 +68,15 @@ def train_gmm(opt, train_loader, model, board):
         iter_start_time = time.time()
         inputs = train_loader.next_batch()
 
-        im = inputs['image'].cuda()
-        im_pose = inputs['pose_image'].cuda()
-        im_h = inputs['head'].cuda()
-        shape = inputs['shape'].cuda()
-        agnostic = inputs['agnostic'].cuda()
-        c = inputs['cloth'].cuda()
-        cm = inputs['cloth_mask'].cuda()
-        im_c =  inputs['parse_cloth'].cuda()
-        im_g = inputs['grid_image'].cuda()
+        im = inputs['image'].to(device)
+        im_pose = inputs['pose_image'].to(device)
+        im_h = inputs['head'].to(device)
+        shape = inputs['shape'].to(device)
+        agnostic = inputs['agnostic'].to(device)
+        c = inputs['cloth'].to(device)
+        cm = inputs['cloth_mask'].to(device)
+        im_c =  inputs['parse_cloth'].to(device)
+        im_g = inputs['grid_image'].to(device)
             
         grid, theta = model(agnostic, c)
         warped_cloth = F.grid_sample(c, grid, padding_mode='border')

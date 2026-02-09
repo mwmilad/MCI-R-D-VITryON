@@ -9,6 +9,7 @@ import os
 import time
 
 from networks import GMM
+from dataset import ClothWarpingVVHD
 
 from typing import Literal
 
@@ -46,6 +47,31 @@ def get_opt():
 
 device: Literal['cpu', 'cuda'] = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+opt = get_opt()
+model = GMM(opt)
+count_params = sum(p.numel() for p in model.parameters())
+print(f"GMM Network Create.Number of Parameter is : {count_params / 1_000_000} M")
 
-gmm = GMM(get_opt())
-print("GMM Network Create.")
+train_loader = ClothWarpingVVHD()
+print(f"data Network Create.Number of data is : {len(train_loader)}")
+
+model.to(device)
+model.train()
+
+# criterion
+criterionL1 = nn.L1Loss()
+
+batch = next(iter(train_loader))
+print(type(batch))
+
+
+# # optimizer
+# optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr, betas=(0.5, 0.999))
+# scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda = lambda step: 1.0 -
+#         max(0, step - opt.keep_step) / float(opt.decay_step + 1))
+
+# for step in range(opt.keep_step + opt.decay_step):
+#     iter_start_time = time.time()
+#     inputs = next(iter(train_loader))
+#     image = inputs['image'].to(device)
+#     print(op)
