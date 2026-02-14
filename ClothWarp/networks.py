@@ -216,8 +216,8 @@ class TpsGridGen(nn.Module):
         points_X_batch = points[:,:,:,0].unsqueeze(3)
         points_Y_batch = points[:,:,:,1].unsqueeze(3)
         if points_b==1:
-            points_X_batch = points_X_batch.expand((batch_size,)+points_X_batch.size()[1:])
-            points_Y_batch = points_Y_batch.expand((batch_size,)+points_Y_batch.size()[1:])
+            points_X_batch = points_X_batch.expand((batch_size,) + points_X_batch.size()[1:])
+            points_Y_batch = points_Y_batch.expand((batch_size,) + points_Y_batch.size()[1:])
         
         points_X_prime = A_X[:,:,:,:,0]+ \
                        torch.mul(A_X[:,:,:,:,1],points_X_batch) + \
@@ -255,3 +255,15 @@ class GMM(nn.Module):
         grid = self.gridGen(theta)
         return grid, theta
 
+def save_checkpoint(model, save_path):
+    if not os.path.exists(os.path.dirname(save_path)):
+        os.makedirs(os.path.dirname(save_path))
+
+    torch.save(model.cpu().state_dict(), save_path)
+    model.cuda()
+
+def load_checkpoint(model, checkpoint_path):
+    if not os.path.exists(checkpoint_path):
+        return
+    model.load_state_dict(torch.load(checkpoint_path))
+    model.cuda()

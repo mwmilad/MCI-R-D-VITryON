@@ -1,5 +1,7 @@
 venv
 MNIST
+data
+doc
 ClothWarp/data
 .vscode
 __pycache__

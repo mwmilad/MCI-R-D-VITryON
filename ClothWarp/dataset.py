@@ -10,7 +10,9 @@ class ClothWarpingVVHD(Dataset):
     """
     Custom DataLoader for train Warping Module on VITHON-HD Dataset on data folder.
     """
-    def __init__(self, data_path=r'data\zalando-hd-resized\train', w=768, h=1024) -> None:
+
+    GRID_PATH = "grid.png"
+    def __init__(self, data_path=r'data\zolando-hd-resized\train', w=768, h=1024) -> None:
         self.w, self.h = int(w / 2), int(h / 2)
         
         # Create Paths
@@ -67,10 +69,10 @@ class ClothWarpingVVHD(Dataset):
             'cloth': cloth,
             'mask': mask,
             'gt': gt,
+            'grid_image': Image.open(self.GRID_PATH),
             'image_path': self.image_paths[idx],
-            'cloth_path': self.cloth_paths[idx]
+            'cloth_path': self.cloth_paths[idx],
         }
-
 
 # Test the dataset
 if __name__ == "__main__":
@@ -78,6 +80,7 @@ if __name__ == "__main__":
     
     # Get a sample
     sample = dataset[0]
+    sample['grid_image'].show()
     
     print(f"Image shape: {sample['image'].shape}")
     print(f"Cloth shape: {sample['cloth'].shape}")

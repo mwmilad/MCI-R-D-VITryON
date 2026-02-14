@@ -8,7 +8,7 @@ import argparse
 import os
 import time
 
-from networks import GMM
+from networks import GMM, save_checkpoint, load_checkpoint
 
 from typing import Literal
 
@@ -72,13 +72,19 @@ def train_gmm(opt, train_loader, model, board):
         im_pose = inputs['pose_image'].to(device)
         im_h = inputs['head'].to(device)
         shape = inputs['shape'].to(device)
-        agnostic = inputs['agnostic'].to(device)
+        agnostic = inputs['agnostic'].to(device) # agnostic = torch.cat([shape, im_h, pose_map], 0)
         c = inputs['cloth'].to(device)
         cm = inputs['cloth_mask'].to(device)
         im_c =  inputs['parse_cloth'].to(device)
         im_g = inputs['grid_image'].to(device)
+
+        """
+        agnostic = torch.cat([shape, im_h, pose_map], 0)
+        c = cloth_image
+        cm = cloth_image mask
+        """
             
-        grid, theta = model(agnostic, c)
+        grid, theta = model(agnostic, c)  
         warped_cloth = F.grid_sample(c, grid, padding_mode='border')
         warped_mask = F.grid_sample(cm, grid, padding_mode='zeros')
         warped_grid = F.grid_sample(im_g, grid, padding_mode='zeros')
@@ -93,8 +99,8 @@ def train_gmm(opt, train_loader, model, board):
         optimizer.step()
             
         if (step+1) % opt.display_count == 0:
-            board_add_images(board, 'combine', visuals, step+1)
-            board.add_scalar('metric', loss.item(), step+1)
+            # board_add_images(board, 'combine', visuals, step+1)
+            # board.add_scalar('metric', loss.item(), step+1)
             t = time.time() - iter_start_time
             print('step: %8d, time: %.3f, loss: %4f' % (step+1, t, loss.item()), flush=True)
 
