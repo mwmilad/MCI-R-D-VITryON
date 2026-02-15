@@ -6,3 +6,4 @@ ClothWarp/data
 .vscode
 __pycache__
 .gitignore
+test.py

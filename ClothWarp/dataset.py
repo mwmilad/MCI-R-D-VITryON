@@ -4,7 +4,9 @@ import torch
 from torchvision import transforms
 from torch.utils.data import Dataset
 from PIL import Image
-
+from PIL import ImageDraw
+import json
+import numpy as np
 
 class ClothWarpingVVHD(Dataset):
     """
@@ -13,7 +15,7 @@ class ClothWarpingVVHD(Dataset):
 
     GRID_PATH = "grid.png"
     def __init__(self, data_path=r'data\zolando-hd-resized\train', w=768, h=1024) -> None:
-        self.w, self.h = int(w / 2), int(h / 2)
+        self.width, self.height = int(w / 2), int(h / 2)
         
         # Create Paths
         self.BASE_PATH = data_path
@@ -24,27 +26,25 @@ class ClothWarpingVVHD(Dataset):
         self.GT_CLOTH_PATH = os.path.join(self.BASE_PATH, 'gt_cloth_warped_mask')
         
         # Get sorted lists to ensure correspondence
-        self.image_files = sorted(os.listdir(self.IMAGE_PATH))
-        self.cloth_files = sorted(os.listdir(self.CLOTH_PATH))
-        self.mask_files = sorted(os.listdir(self.MASK_CLOTH_PATH))
-        self.gt_files = sorted(os.listdir(self.GT_CLOTH_PATH))
+        self.image_names = sorted(os.listdir(self.IMAGE_PATH))
+        self.cloth_names = sorted(os.listdir(self.CLOTH_PATH))
+        self.mask_names = sorted(os.listdir(self.MASK_CLOTH_PATH))
+        self.gt_names = sorted(os.listdir(self.GT_CLOTH_PATH))
         
         # Create full paths
-        self.image_paths = [os.path.join(self.IMAGE_PATH, f) for f in self.image_files]
-        self.cloth_paths = [os.path.join(self.CLOTH_PATH, f) for f in self.cloth_files]
-        self.mask_cloth_paths = [os.path.join(self.MASK_CLOTH_PATH, f) for f in self.mask_files]
-        self.gt_cloth_paths = [os.path.join(self.GT_CLOTH_PATH, f) for f in self.gt_files]
+        self.image_paths = [os.path.join(self.IMAGE_PATH, f) for f in self.image_names]
+        self.cloth_paths = [os.path.join(self.CLOTH_PATH, f) for f in self.cloth_names]
+        self.mask_cloth_paths = [os.path.join(self.MASK_CLOTH_PATH, f) for f in self.mask_names]
+        self.gt_cloth_paths = [os.path.join(self.GT_CLOTH_PATH, f) for f in self.gt_names]
         
         # Define transforms
         self.img_transform = transforms.Compose([
-            transforms.Resize((self.h, self.w)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                 std=[0.229, 0.224, 0.225])
         ])
         
         self.mask_transform = transforms.Compose([
-            transforms.Resize((self.h, self.w)),
             transforms.ToTensor()
         ])
 
@@ -57,6 +57,32 @@ class ClothWarpingVVHD(Dataset):
         cloth = Image.open(self.cloth_paths[idx]).convert('RGB')
         mask = Image.open(self.mask_cloth_paths[idx]).convert('L')  # Grayscale
         gt = Image.open(self.gt_cloth_paths[idx]).convert('RGB')
+
+
+        im_name = self.image_names[idx]
+                # load pose points
+        pose_name = im_name.replace('.jpg', '_keypoints.json')
+        with open(os.path.join(self.data_path, 'pose', pose_name), 'r') as f:
+            pose_label = json.load(f)
+            pose_data = pose_label['people'][0]['pose_keypoints']
+            pose_data = np.array(pose_data)
+            pose_data = pose_data.reshape((-1,3))
+
+        point_num = pose_data.shape[0]
+        pose_map = torch.zeros(point_num, self.height, self.width)
+        r = self.radius
+        im_pose = Image.new('L', (self.width, self.height))
+        pose_draw = ImageDraw.Draw(im_pose)
+        for i in range(point_num):
+            one_map = Image.new('L', (self.fine_width, self.fine_height))
+            draw = ImageDraw.Draw(one_map)
+            pointx = pose_data[i,0]
+            pointy = pose_data[i,1]
+            if pointx > 1 and pointy > 1:
+                draw.rectangle((pointx-r, pointy-r, pointx+r, pointy+r), 'white', 'white')
+                pose_draw.rectangle((pointx-r, pointy-r, pointx+r, pointy+r), 'white', 'white')
+            one_map = self.transform(one_map)
+            pose_map[i] = one_map[0]
         
         # Apply transforms
         image = self.img_transform(image)
