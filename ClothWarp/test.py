@@ -52,7 +52,7 @@ model = GMM(opt)
 count_params = sum(p.numel() for p in model.parameters())
 print(f"GMM Network Create.Number of Parameter is : {count_params / 1_000_000} M")
 
-train_loader = ClothWarpingVVHD()
+train_loader = ClothWarpingVVHD(r'.\data')
 print(f"data Network Create.Number of data is : {len(train_loader)}")
 
 model.to(device)

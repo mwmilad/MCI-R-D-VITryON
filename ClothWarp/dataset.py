@@ -62,15 +62,15 @@ class ClothWarpingVVHD(Dataset):
         im_name = self.image_names[idx]
                 # load pose points
         pose_name = im_name.replace('.jpg', '_keypoints.json')
-        with open(os.path.join(self.data_path, 'pose', pose_name), 'r') as f:
+        with open(os.path.join(self.BASE_PATH, 'openpose_json', pose_name), 'r') as f:
             pose_label = json.load(f)
-            pose_data = pose_label['people'][0]['pose_keypoints']
+            pose_data = pose_label['people'][0]['pose_keypoints_2d']
             pose_data = np.array(pose_data)
             pose_data = pose_data.reshape((-1,3))
-
+        
+        r = 5
         point_num = pose_data.shape[0]
         pose_map = torch.zeros(point_num, self.height, self.width)
-        r = self.radius
         im_pose = Image.new('L', (self.width, self.height))
         pose_draw = ImageDraw.Draw(im_pose)
         for i in range(point_num):
@@ -85,19 +85,22 @@ class ClothWarpingVVHD(Dataset):
             pose_map[i] = one_map[0]
         
         # Apply transforms
-        image = self.img_transform(image)
-        cloth = self.img_transform(cloth)
+        image = self.img_transform(image) 
+        cloth = self.img_transform(cloth) 
         mask = self.mask_transform(mask)
-        gt = self.img_transform(gt)
+        im_pose = self.img_transform(im_pose)
+        gt = self.img_transform(gt) 
+
         
         return {
-            'image': image,
+            'image': image, # Just for Visualization
             'cloth': cloth,
             'mask': mask,
+            'im_pose': im_pose
             'gt': gt,
-            'grid_image': Image.open(self.GRID_PATH),
-            'image_path': self.image_paths[idx],
-            'cloth_path': self.cloth_paths[idx],
+            'grid_image': Image.open(self.GRID_PATH), # Just for Visualization
+            'image_path': self.image_paths[idx], # Just for Information
+            'cloth_path': self.cloth_paths[idx], # Just for Information
         }
 
 # Test the dataset

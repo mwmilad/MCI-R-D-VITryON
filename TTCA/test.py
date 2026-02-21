@@ -12,7 +12,7 @@ def read_images(texture_path, cloth_path, mask_path):
     _, mask = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
     return tex, cloth, mask
 
-def make_tiled_texture(texture, target_w, target_h, tile_scale=1.0, rotation_deg=0):
+def make_tiled_texture(texture, target_w, target_h, tile_scale=1, rotation_deg=0):
     # Resize texture by tile_scale, but do NOT stretch to target size.
     th, tw = texture.shape[:2]
     new_w = max(1, int(tw * tile_scale))
@@ -78,7 +78,7 @@ def apply_texture_seamless_clone(cloth, tiled_patch, mask_patch, x, y, clone_mod
     return cloned
 
 def texture_on_cloth(texture_path, cloth_path, mask_path,
-                     tile_scale=1.0, rotation_deg=0,
+                     tile_scale=1, rotation_deg=0,
                      blend_method='lab', use_seamless_mode=cv2.NORMAL_CLONE):
     """
     blend_method: 'lab' to keep luminance, 'seamless' to use seamlessClone, 'alpha' to simple alpha blend
@@ -109,10 +109,12 @@ def texture_on_cloth(texture_path, cloth_path, mask_path,
 
 if __name__ == "__main__":
     # === USER PARAMETERS ===
-    texture_path = r"C:\PythonProject\MCI-R-D-VITryON\TTCA\sample\texture_sample\texture3.jpg"
-    cloth_path   = r"TTCA\sample\cloth\00049_00.jpg"
-    mask_path    = r"TTCA\sample\inshop_cloth_mask\00049_00.jpg"
-    tile_scale   = 0.5   # try 0.5, 1.0, 2.0 to change tile size
+    texture_path = r"C:\PythonProject\MCI-R-D-VITryON\TTCA\sample\texture_sample\132.jpg"
+    # cloth_path   = r"TTCA\sample\cloth\00049_00.jpg"
+    cloth_path   = r"data\zolando-hd-resized\train\image\00555_00.jpg"
+    # mask_path    = r"TTCA\sample\inshop_cloth_mask\00049_00.jpg"
+    mask_path    = r"C:\PythonProject\MCI-R-D-VITryON\data\zolando-hd-resized\train\gt_cloth_warped_mask\00555_00.jpg"
+    tile_scale   = 0.6   # try 0.5, 1.0, 2.0 to change tile size
     rotation_deg = 0
     blend_method = 'lab' # 'lab' (recommended), 'seamless', or 'alpha'
     # =======================
@@ -121,5 +123,9 @@ if __name__ == "__main__":
                            tile_scale=tile_scale,
                            rotation_deg=rotation_deg,
                            blend_method=blend_method)
+    cloth = cv2.imread(cloth_path)
     cv2.imwrite("cloth_with_texture.png", out)
+    cv2.imshow('out', out)
+    cv2.imshow('cloth image', cloth)
+    cv2.waitKey(0)
     print("Saved as cloth_with_texture.png")
