@@ -3,14 +3,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 import argparse
 import os
 import time
-
 from networks import GMM, save_checkpoint, load_checkpoint
-
 from typing import Literal
+from torch.utils.data import DataLoader
+from dataset import ClothWarpingVVHD
 
 #from networks import GMM UnetGenerator, VGGLoss, load_checkpoint, save_checkpoint
 
@@ -23,13 +22,12 @@ def get_opt():
     parser.add_argument("--gpu_ids", default = "")
     parser.add_argument('-j', '--workers', type=int, default=1)
     parser.add_argument('-b', '--batch-size', type=int, default=4)
-    parser.add_argument("--dataroot", default = "data")
+    parser.add_argument("--dataroot", default = 'data\zolando-hd-resized\train')
     parser.add_argument("--datamode", default = "train")
     parser.add_argument("--stage", default = "GMM")
     parser.add_argument("--data_list", default = "train_pairs.txt")
     parser.add_argument("--fine_width", type=int, default = 192)
     parser.add_argument("--fine_height", type=int, default = 256)
-    parser.add_argument("--radius", type=int, default = 5, )
     parser.add_argument("--grid_size", type=int, default = 5)
     parser.add_argument('--lr', type=float, default=0.0001, help='initial learning rate for adam')
     parser.add_argument('--tensorboard_dir', type=str, default='tensorboard', help='save tensorboard infos')
@@ -51,6 +49,23 @@ gmm = GMM(get_opt())
 print("GMM Network Create.")
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+count_params = sum(p.numel() for p in gmm.parameters())
+print(f"Number of Parameter is : {count_params / 1_000_000} M")
+
+dataset = ClothWarpingVVHD()
+print(f"data Network Create.Number of data is : {len(dataset)}")
+
+gmm.to(device)
+gmm.train()
+
+# criterion
+criterionL1 = nn.L1Loss()
+
+# train_loader = DataLoader(dataset, batch_size=4, shuffle=True)
+
+sample = dataset[10]
+print(sample['im_pose'].show())
+
 
 def train_gmm(opt, train_loader, model, board):
     model.to(device)
@@ -79,6 +94,7 @@ def train_gmm(opt, train_loader, model, board):
         im_g = inputs['grid_image'].to(device)
 
         """
+        model input
         agnostic = torch.cat([shape, im_h, pose_map], 0)
         c = cloth_image
         cm = cloth_image mask

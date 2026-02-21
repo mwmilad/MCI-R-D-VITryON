@@ -10,6 +10,8 @@ import os.path as osp
 import numpy as np
 import json
 
+
+
 class CPDataset(data.Dataset):
     """Dataset for CP-VTON.
     """
@@ -133,7 +135,7 @@ class CPDataset(data.Dataset):
             'cloth':    c,          # for input
             'cloth_mask':     cm,   # for input
             'image':    im,         # for visualization
-            'agnostic': agnostic,   # for input
+            'agnostic': agnostic,   # for input [shape, im_h, pose_map]
             'parse_cloth': im_c,    # for ground truth
             'shape': shape,         # for visualization
             'head': im_h,           # for visualization
