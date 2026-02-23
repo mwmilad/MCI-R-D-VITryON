@@ -9,7 +9,7 @@ import os
 import time
 
 from networks import GMM
-from dataset import ClothWarpingVVHD
+from dataset import HDVitonDataset, HDVitonDataLoader
 
 from typing import Literal
 
@@ -28,11 +28,11 @@ def get_opt():
     parser.add_argument("--datamode", default = "train")
     parser.add_argument("--stage", default = "GMM")
     parser.add_argument("--data_list", default = "train_pairs.txt")
-    parser.add_argument("--fine_width", type=int, default = 192)
-    parser.add_argument("--fine_height", type=int, default = 256)
+    parser.add_argument("--fine_width", type=int, default = 768)
+    parser.add_argument("--fine_height", type=int, default = 1024)
     parser.add_argument("--radius", type=int, default = 5)
     parser.add_argument("--grid_size", type=int, default = 5)
-    parser.add_argument('--lr', type=float, default=0.0001, help='initial learning rate for adam')
+    parser.add_argument('--lr', type=float, default=0.0001, help='initial learning rate for Adam optimization')
     parser.add_argument('--tensorboard_dir', type=str, default='tensorboard', help='save tensorboard infos')
     parser.add_argument('--checkpoint_dir', type=str, default='checkpoints', help='save checkpoint infos')
     parser.add_argument('--checkpoint', type=str, default='', help='model checkpoint for initialization')
@@ -52,7 +52,8 @@ model = GMM(opt)
 count_params = sum(p.numel() for p in model.parameters())
 print(f"GMM Network Create.Number of Parameter is : {count_params / 1_000_000} M")
 
-train_loader = ClothWarpingVVHD(r'.\data')
+dataset = HDVitonDataset(opt)
+train_loader = HDVitonDataLoader(opt, dataset)
 print(f"data Network Create.Number of data is : {len(train_loader)}")
 
 model.to(device)

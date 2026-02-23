@@ -1,131 +1,210 @@
-import torchvision
-import os 
+#coding=utf-8
 import torch
-from torchvision import transforms
-from torch.utils.data import Dataset
+import torch.utils.data as data
+import torchvision.transforms as transforms
+
 from PIL import Image
 from PIL import ImageDraw
-import json
+
+import os.path as osp
 import numpy as np
+import json
+import matplotlib.pyplot as plt
 
-
-
-class ClothWarpingVVHD(Dataset):
+class HDVitonDataset(data.Dataset):
+    """Dataset for CP-VTON.
     """
-    Custom DataLoader for train Warping Module on VITHON-HD Dataset on data folder.
-    """
-
-    GRID_PATH = "grid.png"
-    def __init__(self, data_path=r'data\zolando-hd-resized\train', w=768, h=1024) -> None:
-        self.width, self.height = int(w), int(h)
-        
-        # Create Paths
-        self.BASE_PATH = data_path
-        self.IMAGE_PATH = os.path.join(self.BASE_PATH, 'image')
-        self.CLOTH_PATH = os.path.join(self.BASE_PATH, 'cloth')
-        self.MASK_CLOTH_PATH = os.path.join(self.BASE_PATH, 'cloth-mask')
-        self.DENSE_POSE_PATH = os.path.join(self.BASE_PATH, 'image-densepose')
-        self.GT_CLOTH_PATH = os.path.join(self.BASE_PATH, 'gt_cloth_warped_mask')
-        
-        # Get sorted lists to ensure correspondence
-        print(self.IMAGE_PATH)
-        self.image_names = sorted(os.listdir(self.IMAGE_PATH))
-        self.cloth_names = sorted(os.listdir(self.CLOTH_PATH))
-        self.mask_names = sorted(os.listdir(self.MASK_CLOTH_PATH))
-        self.gt_names = sorted(os.listdir(self.GT_CLOTH_PATH))
-        
-        # Create full paths
-        self.image_paths = [os.path.join(self.IMAGE_PATH, f) for f in self.image_names]
-        self.cloth_paths = [os.path.join(self.CLOTH_PATH, f) for f in self.cloth_names]
-        self.mask_cloth_paths = [os.path.join(self.MASK_CLOTH_PATH, f) for f in self.mask_names]
-        self.gt_cloth_paths = [os.path.join(self.GT_CLOTH_PATH, f) for f in self.gt_names]
-        
-        # Define transforms
-        self.img_transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(mean=(0.5, 0.5, 0.5),
-                                     std=(0.5, 0.5, 0.5))
-                                     ])
+    def __init__(self, opt):
+        super(HDVitonDataset, self).__init__()
+        # base setting
+        self.opt = opt
+        self.root = opt.dataroot
+        self.datamode = opt.datamode # train or test or self-defined
+        self.stage = opt.stage # GMM or TOM
+        self.data_list = opt.data_list
+        self.fine_height = opt.fine_height
+        self.fine_width = opt.fine_width
+        self.radius = opt.radius
+        self.data_path = osp.join(opt.dataroot, opt.datamode)
+        self.transform = transforms.Compose([  \
+                transforms.ToTensor(),   \
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
         
         self.mask_transform = transforms.Compose([
-            transforms.ToTensor()
+            transforms.ToTensor(),
+            transforms.Normalize(mean=0.5, std=0.5)
         ])
-
-    def __len__(self):
-        return len(self.image_paths)
-
-    def __getitem__(self, idx):
-        # ---- Read Images ----
-        image = Image.open(self.image_paths[idx]).convert('RGB')
-        cloth = Image.open(self.cloth_paths[idx]).convert('RGB')
-        mask = Image.open(self.mask_cloth_paths[idx]).convert('L')  # Grayscale
-        gt = Image.open(self.gt_cloth_paths[idx]).convert('RGB')
-
-        im_name = self.image_names[idx]
-
-        # ---- Load JSON ----
-        pose_name = im_name.replace('.jpg', '_keypoints.json')
-        with open(os.path.join(self.BASE_PATH, 'openpose_json', pose_name), 'r') as f:
         
-            data = json.load(f)
+        # load data list
+        im_names = []
+        c_names = []
+        with open(osp.join(opt.dataroot, opt.data_list), 'r') as f:
+            for line in f.readlines():
+                im_name, c_name = line.strip().split()
+                im_names.append(im_name)
+                c_names.append(c_name)
 
-        keypoints = data["people"][0]["pose_keypoints_2d"]
-        keypoints = np.array(keypoints).reshape(-1, 3)
+        self.im_names = im_names
+        self.c_names = c_names
 
-        # ---- Create black mask ----
-        im_pose = Image.new("L", (self.width, self.height), 0)  # "L" = grayscale
+    def name(self):
+        return "CPDataset"
+
+    def __getitem__(self, index):
+        c_name = self.c_names[index]
+        im_name = self.im_names[index]
+
+        # cloth image & cloth mask
+        if self.stage == 'GMM':
+            c = Image.open(osp.join(self.data_path, 'cloth', c_name))
+            cm = Image.open(osp.join(self.data_path, 'cloth-mask', c_name))
+        else:
+            c = Image.open(osp.join(self.data_path, 'warp-cloth', c_name))
+            cm = Image.open(osp.join(self.data_path, 'warp-mask', c_name))
+     
+        c = self.transform(c)  # [-1,1]
+        cm_array = np.array(cm)
+        cm_array = (cm_array >= 128).astype(np.float32)
+        cm = torch.from_numpy(cm_array) # [0,1]
+        cm.unsqueeze_(0)
+
+        # person image 
+        im = Image.open(osp.join(self.data_path, 'image', im_name))
+        im = self.transform(im) # [-1,1]
+
+        # load parsing image
+        parse_name = im_name.replace('.jpg', '.png')
+        im_parse = Image.open(osp.join(self.data_path, 'image-parse-v3', parse_name))
+        parse_array = np.array(im_parse)
+        parse_shape = (parse_array > 0).astype(np.float32)
+        parse_head = (parse_array == 1).astype(np.float32) + \
+                (parse_array == 2).astype(np.float32) + \
+                (parse_array == 4).astype(np.float32) + \
+                (parse_array == 13).astype(np.float32)
+        parse_cloth = (parse_array == 5).astype(np.float32) + \
+                (parse_array == 6).astype(np.float32) + \
+                (parse_array == 7).astype(np.float32)
+       
+        # shape downsample
+        parse_shape = Image.fromarray((parse_shape*255).astype(np.uint8))
+        parse_shape = parse_shape.resize((self.fine_width//16, self.fine_height//16), Image.BILINEAR)
+        parse_shape = parse_shape.resize((self.fine_width, self.fine_height), Image.BILINEAR)
+        shape = self.mask_transform(parse_shape) # [-1,1]
+        phead = torch.from_numpy(parse_head) # [0,1]
+        pcm = torch.from_numpy(parse_cloth) # [0,1]
+
+        # upper cloth
+        im_c = im * pcm + (1 - pcm) # [-1,1], fill 1 for other parts
+        im_h = im * phead - (1 - phead) # [-1,1], fill 0 for other parts
+
+        # load pose points
+        pose_name = im_name.replace('.jpg', '_keypoints.json')
+        with open(osp.join(self.data_path, 'openpose_json', pose_name), 'r') as f:
+            pose_label = json.load(f)
+            pose_data = pose_label['people'][0]['pose_keypoints_2d']
+            pose_data = np.array(pose_data)
+            pose_data = pose_data.reshape((-1, 3))
+
+        point_num = pose_data.shape[0]
+        pose_map = torch.zeros(14, self.fine_height, self.fine_width)
+        r = self.radius
+        im_pose = Image.new('L', (self.fine_width, self.fine_height))
         pose_draw = ImageDraw.Draw(im_pose)
-
-        # ---- Draw white circles ----
-        radius = 10
-        i = 0
-        pose_map = torch.zeros(keypoints.shape[0], self.height, self.width)
-        for x, y, conf in keypoints:
-            one_map = Image.new('L', (self.width, self.height))
+        for i in range(14):
+            one_map = Image.new('L', (self.fine_width, self.fine_height))
             draw = ImageDraw.Draw(one_map)
-            if conf > 0.3:  # confidence threshold
-                left_up = (x - radius, y - radius)
-                right_down = (x + radius, y + radius)
-                draw.ellipse([left_up, right_down], fill=255)
-                pose_draw.ellipse([left_up, right_down], fill=255)
-
+            pointx = pose_data[i,0]
+            pointy = pose_data[i,1]
+            if pointx > 1 and pointy > 1:
+                draw.rectangle((pointx-r, pointy-r, pointx+r, pointy+r), 'white', 'white')
+                pose_draw.rectangle((pointx-r, pointy-r, pointx+r, pointy+r), 'white', 'white')
+            
             one_map = self.mask_transform(one_map)
             pose_map[i] = one_map[0]
-            i += 1
         
+        # pose_map_one_dim = torch.sum(pose_map, 0)
+        # print(im_name)
+        # plt.figure(figsize=(12, 6))
+        # plt.imshow(pose_map_one_dim, cmap='hot', interpolation='nearest')
+        # plt.colorbar(label='Number of keypoints per pixel')
+        # plt.title('All Keypoints Combined')
+        # plt.axis('off')
+        # plt.show()
         
-        
-        # Apply transforms
-        image = self.img_transform(image) 
-        cloth = self.img_transform(cloth) 
-        mask = self.mask_transform(mask)
+        # cloth-agnostic representation
         agnostic = torch.cat([shape, im_h, pose_map], 0)
 
-        gt = self.img_transform(gt) 
+        if self.stage == 'GMM':
+            im_g = Image.open('grid.png')
+            im_g = self.transform(im_g)
+        else:
+            im_g = ''
 
-        
-        return {
-            'image': image, # Just for Visualization (Tensor Image)
-            'cloth': cloth,
-            'mask': mask,
-            'im_pose': im_pose, # Just for visualization
-            'gt': gt,
-            'grid_image': Image.open(self.GRID_PATH), # Just for Visualization
-            'image_path': self.image_paths[idx], # Just for Information
-            'cloth_path': self.cloth_paths[idx], # Just for Information
-        }
+        result = {
+            'c_name': c_name,        # for visualization
+            'im_name': im_name,      # for visualization or ground truth
+            'cloth': c,              # for input
+            'cloth_mask': cm,        # for input (torch type)
+            'image': im,             # for visualization
+            'agnostic': agnostic,    # for input [shape, im_h, pose_map] (tensor type)
+            'parse_cloth': im_c,     # for ground truth
+            'shape': shape,          # for visualization
+            'head': im_h,            # for visualization
+            'pose_image': self.mask_transform(im_pose),   # for visualization
+            'grid_image': im_g,      # for visualization
+            }
 
-# Test the dataset
+        return result
+
+    def __len__(self):
+        return len(self.im_names)
+
+class HDVitonDataLoader():
+    def __init__(self, opt, dataset):
+        super(HDVitonDataLoader, self).__init__()
+
+        if opt.shuffle :
+            train_sampler = torch.utils.data.sampler.RandomSampler(dataset)
+        else:
+            train_sampler = None
+
+        self.data_loader = torch.utils.data.DataLoader(
+                dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None),
+                num_workers=opt.workers, pin_memory=True, sampler=train_sampler)
+        self.dataset = dataset
+        self.data_iter = self.data_loader.__iter__()
+       
+    def next_batch(self):
+        try:
+            batch = self.data_iter.__next__()
+        except StopIteration:
+            self.data_iter = self.data_loader.__iter__()
+            batch = self.data_iter.__next__()
+
+        return batch
+
+
 if __name__ == "__main__":
-    dataset = ClothWarpingVVHD()
+    print("Check the dataset for geometric matching module!")
     
-    # Get a sample
-    sample = dataset[0]
-    sample['grid_image'].show()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataroot", default = "data\zolando-hd-resized")
+    parser.add_argument("--datamode", default = "train")
+    parser.add_argument("--stage", default = "GMM")
+    parser.add_argument("--data_list", default = "train_pairs.txt")
+    parser.add_argument("--fine_width", type=int, default = 768)
+    parser.add_argument("--fine_height", type=int, default = 1024)
+    parser.add_argument("--radius", type=int, default = 5)
+    parser.add_argument("--shuffle", action='store_true', help='shuffle input data')
+    parser.add_argument('-b', '--batch-size', type=int, default=1)
+    parser.add_argument('-j', '--workers', type=int, default=1)
     
-    print(f"Image shape: {sample['image'].shape}")
-    print(f"Cloth shape: {sample['cloth'].shape}")
-    print(f"Mask shape: {sample['mask'].shape}")
-    print(f"GT shape: {sample['gt'].shape}")
-    print(f"Image min/max: {sample['image'].min():.3f}/{sample['image'].max():.3f}")
-    print(f"Mask min/max: {sample['mask'].min():.3f}/{sample['mask'].max():.3f}")
+    opt = parser.parse_args()
+    dataset = HDVitonDataset(opt)
+    data_loader = HDVitonDataLoader(opt, dataset)
+
+    print('Size of the dataset: %05d, dataloader: %04d' \
+            % (len(dataset), len(data_loader.data_loader)))
+    first_item = dataset.__getitem__(0)
+    first_batch = data_loader.next_batch()

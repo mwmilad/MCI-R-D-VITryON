@@ -9,7 +9,7 @@ import time
 from networks import GMM, save_checkpoint, load_checkpoint
 from typing import Literal
 from torch.utils.data import DataLoader
-from dataset import ClothWarpingVVHD
+from dataset import HDVitonDataset, HDVitonDataLoader
 
 #from networks import GMM UnetGenerator, VGGLoss, load_checkpoint, save_checkpoint
 
@@ -44,16 +44,17 @@ def get_opt():
 
 device: Literal['cpu', 'cuda'] = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-
-gmm = GMM(get_opt())
+opt = get_opt()
+gmm = GMM(opt)
 print("GMM Network Create.")
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 count_params = sum(p.numel() for p in gmm.parameters())
 print(f"Number of Parameter is : {count_params / 1_000_000} M")
 
-dataset = ClothWarpingVVHD()
+dataset = HDVitonDataset(opt=opt)
 print(f"data Network Create.Number of data is : {len(dataset)}")
+train_loader = HDVitonDataLoader(opt, dataset)
 
 gmm.to(device)
 gmm.train()
