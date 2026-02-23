@@ -7,3 +7,4 @@ ClothWarp/data
 __pycache__
 .gitignore
 checkpoints
+tensorboard
