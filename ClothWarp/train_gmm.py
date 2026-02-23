@@ -14,8 +14,9 @@ from dataset import HDVitonDataset, HDVitonDataLoader
 from tensorboardX import SummaryWriter
 from networks import GMM, UnetGenerator, VGGLoss, load_checkpoint, save_checkpoint
 
-# from visualization import board_add_image, board_add_images
+from visuality import board_add_image, board_add_images
 
+from test import test_gmm
 #from networks import GMM UnetGenerator, VGGLoss, load_checkpoint, save_checkpoint
 
 # from tensorboardX import SummaryWriter
@@ -27,7 +28,6 @@ def get_opt():
     parser.add_argument("--gpu_ids", default = "")
     parser.add_argument('-j', '--workers', type=int, default=1)
     parser.add_argument('-b', '--batch-size', type=int, default=4)
-    
     parser.add_argument("--dataroot", default = "data\zolando-hd-resized")
     parser.add_argument("--datamode", default = "train")
     parser.add_argument("--stage", default = "GMM")
@@ -39,12 +39,15 @@ def get_opt():
     parser.add_argument('--lr', type=float, default=0.0001, help='initial learning rate for adam')
     parser.add_argument('--tensorboard_dir', type=str, default='tensorboard', help='save tensorboard infos')
     parser.add_argument('--checkpoint_dir', type=str, default='checkpoints', help='save checkpoint infos')
+    parser.add_argument('--result_dir', type=str, default='result', help='save result infos')
     parser.add_argument('--checkpoint', type=str, default='', help='model checkpoint for initialization')
     parser.add_argument("--display_count", type=int, default = 20)
-    parser.add_argument("--save_count", type=int, default = 100)
+    parser.add_argument("--save_count", type=int, default = 500)
     parser.add_argument("--keep_step", type=int, default = 100000)
     parser.add_argument("--decay_step", type=int, default = 100000)
+    parser.add_argument("--save_test", type=int, default=500)
     parser.add_argument("--shuffle", action='store_true', help='shuffle input data')
+    
 
     opt = parser.parse_args()
     return opt
@@ -104,9 +107,9 @@ def train_gmm(opt, train_loader, model, board):
         """
             
         grid, theta = model(agnostic, c)  
-        warped_cloth = F.grid_sample(c, grid, padding_mode='border')
-        warped_mask = F.grid_sample(cm, grid, padding_mode='zeros')
-        warped_grid = F.grid_sample(im_g, grid, padding_mode='zeros')        
+        warped_cloth = F.grid_sample(c, grid, padding_mode='border', align_corners=True)
+        warped_mask = F.grid_sample(cm, grid, padding_mode='zeros', align_corners=True)
+        warped_grid = F.grid_sample(im_g, grid, padding_mode='zeros', align_corners=True)        
         # print(im_h.shape)
         # print(shape.shape)
         # print(im_pose.shape)
@@ -132,6 +135,9 @@ def train_gmm(opt, train_loader, model, board):
         if (step+1) % opt.save_count == 0:
             save_checkpoint(model, os.path.join(opt.checkpoint_dir, opt.name, 'step_%06d.pth' % (step+1)))
 
+        if (step+1) % opt.save_test == 0:
+            with torch.no_grad():
+                test_gmm(opt, train_loader, model, board)
 
 def train_tom(opt, train_loader, model, board):
     model.cuda()
@@ -191,6 +197,8 @@ def train_tom(opt, train_loader, model, board):
 
         if (step+1) % opt.save_count == 0:
             save_checkpoint(model, os.path.join(opt.checkpoint_dir, opt.name, 'step_%06d.pth' % (step+1)))
+        
+                
 
 def main():
     opt = get_opt()
@@ -219,8 +227,8 @@ def main():
         model = UnetGenerator(25, 4, 6, ngf=64, norm_layer=nn.InstanceNorm2d)
         if not opt.checkpoint =='' and os.path.exists(opt.checkpoint):
             load_checkpoint(model, opt.checkpoint)
-        train_tom(opt, train_loader, model, board)
-        save_checkpoint(model, os.path.join(opt.checkpoint_dir, opt.name, 'tom_final.pth'))
+        # train_tom(opt, train_loader, model, board)
+        # save_checkpoint(model, os.path.join(opt.checkpoint_dir, opt.name, 'tom_final.pth'))
     else:
         raise NotImplementedError('Model [%s] is not implemented' % opt.stage)
         
