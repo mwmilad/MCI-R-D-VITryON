@@ -92,7 +92,8 @@ class ClothWarpingVVHD(Dataset):
             one_map = self.mask_transform(one_map)
             pose_map[i] = one_map[0]
             i += 1
-            
+        
+        
         
         # Apply transforms
         image = self.img_transform(image) 
