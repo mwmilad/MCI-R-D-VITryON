@@ -141,6 +141,11 @@ class HDVitonDataset(data.Dataset):
         # cloth-agnostic representation
         im_h = torchvision.transforms.functional.resize(im_h, (self.fine_height, self.fine_width))
         agnostic = torch.cat([shape, im_h, pose_map], 0)
+        
+        agnostic_name = im_name.replace('.jpg', '_mask.png')
+        agnostic_mask = Image.open(osp.join(self.data_path, 'agnostic-mask', agnostic_name))
+        agnostic_mask = agnostic_mask.resize((self.fine_width, self.fine_height), Image.BILINEAR)
+        agnostic_mask = self.mask_transform(agnostic_mask)
 
         if self.stage == 'GMM':
             im_g = Image.open('grid.png')
@@ -160,6 +165,7 @@ class HDVitonDataset(data.Dataset):
             'head': im_h,            # for visualization
             'pose_image': im_pose,   # for visualization
             'grid_image': im_g,      # for visualization
+            'agnostic_mask': agnostic_mask
             }
 
         return result
@@ -177,8 +183,8 @@ class HDVitonDataLoader():
             train_sampler = None
 
         self.data_loader = torch.utils.data.DataLoader(
-                dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None),
-                num_workers=0, pin_memory=True, sampler=train_sampler)
+                dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None)
+                , pin_memory=True, sampler=train_sampler)
         self.dataset = dataset
         self.data_iter = self.data_loader.__iter__()
        
@@ -206,7 +212,7 @@ if __name__ == "__main__":
     parser.add_argument("--radius", type=int, default = 5)
     parser.add_argument("--shuffle", action='store_true', help='shuffle input data')
     parser.add_argument('-b', '--batch-size', type=int, default=1)
-    parser.add_argument('-j', '--workers', type=int, default=1)
+    parser.add_argument('-j', '--workers', type=int, default=0)
     
     opt = parser.parse_args()
     dataset = HDVitonDataset(opt)
